@@ -129,6 +129,26 @@ fn path_provided_does_not_exists() {
     assert!(stderr.contains(" does not exists."), "{}", stderr);
 }
 
+#[test]
+fn path_to_crate_triggers_error() {
+    let dir = tempdir();
+    let mut cmd = init_cmd(&dir);
+    let dir_path_str = dir.path().to_str().unwrap();
+    cmd.arg(dir_path_str);
+    let foo_path = dir.path().join("foo");
+    let foo_path_str = foo_path.to_str().unwrap();
+    cmd.arg(foo_path_str);
+    let output = cmd.output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Don't pass a path to `wasm-pack test` options"),
+        "{}",
+        stderr
+    );
+    assert!(stderr.contains(foo_path_str), "{}", stderr);
+}
+
 #[cfg(feature = "workspace")]
 #[test]
 fn no_crates_found_in_workspace() {
