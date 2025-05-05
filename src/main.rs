@@ -149,12 +149,14 @@ fn run(cmd: &mut clap::Command) -> ExitCode {
         .unwrap_or_default()
         .map(|s| s.to_string())
         .collect();
-    wasm_pack_test_options.extend(extra_options
-        .iter()
-        .filter(|s| s.starts_with("--"))
-        .take_while(|s| *s != "--")
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>());
+    wasm_pack_test_options.extend(
+        extra_options
+            .iter()
+            .filter(|s| s.starts_with("--"))
+            .take_while(|s| *s != "--")
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+    );
     let cargo_test_options = extra_options
         .iter()
         .skip_while(|s| *s != "--")
@@ -166,13 +168,27 @@ fn run(cmd: &mut clap::Command) -> ExitCode {
             if wasm_pack_test_options.is_empty() {
                 String::new()
             } else {
-                format!("{} ", wasm_pack_test_options.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(" "))
+                format!(
+                    "{} ",
+                    wasm_pack_test_options
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
             },
             testable_crate_path.display(),
             if cargo_test_options.is_empty() {
                 String::new()
             } else {
-                format!(" {}", cargo_test_options.iter().map(|s| s.to_string()).collect::<Vec<_>>().join(" "))
+                format!(
+                    " {}",
+                    cargo_test_options
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
             }
         );
         print_to_stdout!("+ {}", args);

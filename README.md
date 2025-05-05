@@ -1,6 +1,7 @@
 # wasm-pack-test-all
 
-Wrapper for `wasm-pack test` that runs tests for all crates in a workspace or directory.
+Wrapper for `wasm-pack test` that runs tests for all crates in a workspace or
+directory.
 
 ## Installation
 
@@ -41,11 +42,19 @@ repos:
 wasm-pack-test-all [PATH] [WASM_PACK_TEST_OPTIONS]... -- [CARGO_TEST_OPTIONS]...
 ```
 
-When running the command without any arguments, if there is a `Cargo.toml` file in the current directory with a workspace configured, it will run `wasm-pack test` for all crates in the workspace. When there it is not a workspace, it will run `wasm-pack test` for all crates in the current directory and subdirectories.
+When running the command without any arguments, if there is a `Cargo.toml` file
+in the current directory with a workspace configured, it will run
+`wasm-pack test` for all crates in the workspace. When there it is not a
+workspace, it will run `wasm-pack test` for all crates in the current directory
+and subdirectories.
 
-Providing a path, it will run `wasm-pack test` for all crates in that path. Providing extra options, they will be passed to `wasm-pack test` for each crate. To pass options to `cargo test`, use the `--` separator.
+Providing a path, it will run `wasm-pack test` for all crates in that path.
+Providing extra options, they will be passed to `wasm-pack test` for each crate.
+To pass options to `cargo test`, use the `--` separator.
 
-Don't pass a path to `wasm-pack test` options, as it will be interpreted as a crate path. If you want to test a crate individually, use `wasm-pack test` directly.
+Don't pass a path to `wasm-pack test` options, as it will be interpreted as a
+crate path. If you want to test a crate individually, use `wasm-pack test`
+directly.
 
 ### Examples
 
@@ -60,10 +69,6 @@ wasm-pack-test-all tests/end2end --chrome
 ```sh
 wasm-pack-test-all tests/end2end --firefox --release -- --offline
 ```
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 [cargo-binstall]: https://github.com/cargo-bins/cargo-binstall
 [pre-commit]: https://pre-commit.com
