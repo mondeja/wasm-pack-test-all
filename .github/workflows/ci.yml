@@ -192,6 +192,7 @@ jobs:
         with:
           rust-version: stable
           profile: minimal
+          targets: wasm32-unknown-unknown
       - name: Install wasm-pack
         uses: taiki-e/install-action@v2
         with:
