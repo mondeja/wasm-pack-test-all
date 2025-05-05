@@ -82,7 +82,7 @@ macro_rules! gather_crate_paths {
             return ExitCode::NoCratesFound;
         }
         print_to_stdout!(
-            "Found {} crates in the directory at {}",
+            "Found {} crates in the directory {}.",
             crates.len(),
             &$path.display()
         );
@@ -204,7 +204,7 @@ fn run(args: Vec<String>) -> ExitCode {
                     }
                 }
                 print_to_stdout!(
-                    "Trying to run for {} crates in the workspace at {}",
+                    "Found {} crates in the workspace {}",
                     workspace_members.len(),
                     path.display()
                 );
@@ -299,18 +299,31 @@ fn run(args: Vec<String>) -> ExitCode {
 /// Considers a crate a directory containing a `Cargo.toml` file.
 fn gather_crates_paths_in_dir_or_subdirs(path: &std::path::PathBuf) -> Vec<std::path::PathBuf> {
     let mut paths = Vec::new();
-    if path.is_dir() {
-        for entry in std::fs::read_dir(path).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.is_dir() {
-                paths.extend(gather_crates_paths_in_dir_or_subdirs(&path));
-            } else if path.is_file() && path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml"))
-            {
-                paths.push(path.parent().unwrap().to_path_buf());
+    let path_cargo_toml = path.join("Cargo.toml");
+    if path_cargo_toml.is_file() {
+        paths.push(path.clone());
+    }
+    paths.extend(gather_crates_paths_in_subdirs(path));
+    paths
+}
+
+fn gather_crates_paths_in_subdirs(path: &std::path::PathBuf) -> Vec<std::path::PathBuf> {
+    let mut paths = Vec::new();
+    for entry in std::fs::read_dir(path).unwrap() {
+        let entry = entry.unwrap();
+        let entry_path = entry.path();
+        if entry_path.is_dir() {
+            paths.extend(gather_crates_paths_in_subdirs(&entry_path));
+        } else if entry_path.is_file()
+            && entry_path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml"))
+        {
+            let new_path = entry_path.parent().unwrap().to_path_buf();
+            if !paths.contains(&new_path) {
+                paths.push(new_path);
             }
         }
     }
+
     paths
 }
 
