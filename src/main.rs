@@ -323,7 +323,6 @@ fn gather_crates_paths_in_subdirs(path: &std::path::PathBuf) -> Vec<std::path::P
             }
         }
     }
-
     paths
 }
 
