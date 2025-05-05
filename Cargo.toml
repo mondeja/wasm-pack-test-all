@@ -14,8 +14,7 @@ categories = ["wasm", "command-line-interface"]
 name = "wasm-pack-test-all"
 
 [dependencies]
-# Compatible versions with `wasm-pack`
-clap = { version = "4", default-features = false, features = ["std", "help"] }
+# Compatible versions with latest `wasm-pack`
 toml = { version = "0.7", optional = true }
 
 [features]

@@ -1,9 +1,9 @@
-mod cli;
 #[cfg(test)]
 mod tests;
 
 fn main() {
-    let exitcode = run(&mut cli::build());
+    let args = std::env::args().skip(1).collect::<Vec<_>>();
+    let exitcode = run(args);
     std::process::exit(exitcode as u8 as i32);
 }
 
@@ -26,6 +26,39 @@ impl PartialEq for ExitCode {
     }
 }
 
+fn print_help() {
+    eprintln!(
+        r#"Wrapper for `wasm-pack test` that runs tests for all crates in a workspace or directory.
+
+wasm-pack-test-all [-h/--help] [-V/--version] [PATH] [WASM_PACK_TEST_OPTIONS] [-- CARGO_TEST_OPTIONS]
+
+Arguments:
+  [PATH]
+          Path to the workspace or directory where all crates to test reside and extra options to pass to `wasm-pack`.
+
+  [WASM_PACK_TEST_OPTIONS]...
+          Options to pass to `wasm-pack`.
+
+          Passing a path as the first argument of EXTRA_OPTIONS will trigger an error.
+
+  [CARGO_TEST_OPTIONS]...
+          Options to pass to `cargo test`. Use `--` to separate them from the `wasm-pack test` options.
+
+Options:
+  -h, --help
+          Print help.
+
+  -V, --version
+          Print version.
+"#
+    );
+}
+
+#[allow(clippy::print_stdout)]
+fn print_version() {
+    println!("wasm-pack-test-all {}", env!("CARGO_PKG_VERSION"));
+}
+
 macro_rules! print_to_stderr {
     ($($arg:tt)*) => {{
         eprintln!("[wasm-pack-test-all] {}", format!($($arg)*));
@@ -34,7 +67,10 @@ macro_rules! print_to_stderr {
 
 macro_rules! print_to_stdout {
     ($($arg:tt)*) => {{
-        println!("[wasm-pack-test-all] {}", format!($($arg)*));
+        #[allow(clippy::print_stdout)]
+        {
+            println!("[wasm-pack-test-all] {}", format!($($arg)*));
+        }
     }};
 }
 
@@ -54,45 +90,78 @@ macro_rules! gather_crate_paths {
     }};
 }
 
-#[doc(hidden)]
-/// Run the wasm-pack-test-all CLI and return the exit code.
-fn run(cmd: &mut clap::Command) -> ExitCode {
-    let mut exitcode = ExitCode::Success;
+fn parse_options(args: &[String]) -> Result<(Option<String>, Vec<String>, Vec<String>), ExitCode> {
+    let mut path_argument = None;
+    let mut wasm_pack_test_options = Vec::new();
+    let mut cargo_test_options = Vec::new();
 
-    let matches = cmd.clone().get_matches();
+    const INSIDE_WASM_PACK_TEST_ALL_OPTIONS: u8 = 1;
+    const INSIDE_WASM_PACK_TEST_OPTIONS: u8 = 2;
+    const INSIDE_CARGO_TEST_OPTIONS: u8 = 4;
+    let mut state: u8 = INSIDE_WASM_PACK_TEST_ALL_OPTIONS;
 
-    // Default clap behaviour is to print help to STDOUT and exit with code 0.
-    // Instead, print to STDERR and exit with code 1.
-    if matches.get_flag("help") {
-        // Print the default help text and exit with code 1
-        cmd.write_long_help(&mut std::io::stderr()).unwrap();
-        return ExitCode::Help;
+    for arg in args {
+        if state == INSIDE_WASM_PACK_TEST_ALL_OPTIONS {
+            if arg == "--" {
+                state <<= 2;
+                cargo_test_options.push(arg.to_string());
+            } else if arg == "--version" || arg == "-V" {
+                print_version();
+                return Err(ExitCode::Success);
+            } else if arg == "--help" || arg == "-h" {
+                print_help();
+                return Err(ExitCode::Help);
+            } else if arg.starts_with('-') {
+                state = INSIDE_WASM_PACK_TEST_OPTIONS;
+                wasm_pack_test_options.push(arg.to_string());
+            } else {
+                path_argument = Some(arg.to_string());
+                state <<= 1;
+            }
+        } else if state == INSIDE_WASM_PACK_TEST_OPTIONS {
+            if arg == "--" {
+                state <<= 1;
+                cargo_test_options.push(arg.to_string());
+            } else if wasm_pack_test_options.is_empty() && !arg.starts_with('-') {
+                // path argument passed to WASM_PACK_TEST_OPTIONS, trigger error
+                print_to_stderr!("Don't pass a path to `wasm-pack test` options (found {}). If you want to test a crate individually, use `wasm-pack test` directly.", arg);
+                std::process::exit(1);
+            } else {
+                wasm_pack_test_options.push(arg.to_string());
+            }
+        } else if state == INSIDE_CARGO_TEST_OPTIONS {
+            cargo_test_options.push(arg.to_string());
+        }
     }
 
-    let mut wasm_pack_test_options: Vec<String> = Vec::new();
-    let path_argument = matches.get_one::<String>("path");
-    let path = if let Some(path) = path_argument {
-        if path.starts_with("-") {
-            // we are passing a wasm-pack test option
-            //
-            // this allows to run `wasm-pack-test-all --node` as if where
-            // `wasm-pack-test-all . --node`
-            wasm_pack_test_options.push(path.to_string());
-            std::env::current_dir().unwrap()
-        } else {
-            let pathbuf = std::path::PathBuf::from(path);
-            if !pathbuf.exists() {
-                // If the path does not exist, print an error message and exit with code 1
-                print_to_stderr!("The path {} does not exists.", pathbuf.display());
-                return ExitCode::PathNotFound;
-            }
-            if !pathbuf.is_dir() {
-                // If the path is not a directory, print an error message and exit with code 1
-                print_to_stderr!("The path {} is not a directory.", pathbuf.display());
-                return ExitCode::NotADirectory;
-            }
-            pathbuf
+    Ok((path_argument, wasm_pack_test_options, cargo_test_options))
+}
+
+#[doc(hidden)]
+/// Run the wasm-pack-test-all CLI and return the exit code.
+fn run(args: Vec<String>) -> ExitCode {
+    let mut exitcode = ExitCode::Success;
+
+    let (path_argument, wasm_pack_test_options, cargo_test_options) = match parse_options(&args) {
+        Ok(options) => options,
+        Err(exitcode) => {
+            return exitcode;
         }
+    };
+
+    let path = if let Some(path) = path_argument {
+        let pathbuf = std::path::PathBuf::from(path);
+        if !pathbuf.exists() {
+            // If the path does not exist, print an error message and exit with code 1
+            print_to_stderr!("The path {} does not exists.", pathbuf.display());
+            return ExitCode::PathNotFound;
+        }
+        if !pathbuf.is_dir() {
+            // If the path is not a directory, print an error message and exit with code 1
+            print_to_stderr!("The path {} is not a directory.", pathbuf.display());
+            return ExitCode::NotADirectory;
+        }
+        pathbuf
     } else {
         std::env::current_dir().unwrap()
     };
@@ -164,24 +233,6 @@ fn run(cmd: &mut clap::Command) -> ExitCode {
 
     print_to_stdout!("Found {} testable crates.", testable_crates_paths.len(),);
     print_to_stdout!("Running tests...");
-
-    let extra_options: Vec<String> = matches
-        .get_many::<String>("extra_options")
-        .unwrap_or_default()
-        .map(|s| s.to_string())
-        .collect();
-    wasm_pack_test_options.extend(
-        extra_options
-            .iter()
-            .filter(|s| s.starts_with("--"))
-            .take_while(|s| *s != "--")
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>(),
-    );
-    let cargo_test_options = extra_options
-        .iter()
-        .skip_while(|s| *s != "--")
-        .collect::<Vec<_>>();
 
     for testable_crate_path in testable_crates_paths {
         let args = format!(
