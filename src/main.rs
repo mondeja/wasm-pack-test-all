@@ -38,6 +38,22 @@ macro_rules! print_to_stdout {
     }};
 }
 
+macro_rules! gather_crates_and_print {
+    ($path:ident) => {{
+        let crates = gather_crates_paths_in_dir_or_subdirs(&$path);
+        if crates.is_empty() {
+            print_to_stderr!("No crates found in the directory {}.", &$path.display());
+            return ExitCode::NoCratesFound;
+        }
+        print_to_stdout!(
+            "Found {} crates in the directory at {}",
+            crates.len(),
+            &$path.display()
+        );
+        crates
+    }};
+}
+
 #[doc(hidden)]
 /// Run the wasm-pack-test-all CLI and return the exit code.
 fn run(cmd: &mut clap::Command) -> ExitCode {
@@ -125,45 +141,17 @@ fn run(cmd: &mut clap::Command) -> ExitCode {
                 );
                 workspace_members
             } else {
-                let crates = gather_crates_paths_in_dir_or_subdirs(&path);
-                if crates.is_empty() {
-                    print_to_stderr!("No crates found in the directory {}.", path.display());
-                    return ExitCode::NoCratesFound;
-                }
-                print_to_stdout!(
-                    "Trying to run for {} crates in the directory at {}",
-                    crates.len(),
-                    path.display()
-                );
-                crates
+                gather_crates_and_print!(path)
             }
         } else {
-            let crates = gather_crates_paths_in_dir_or_subdirs(&path);
-            if crates.is_empty() {
-                print_to_stderr!("No crates found in the directory {}.", path.display());
-                return ExitCode::NoCratesFound;
-            }
-            print_to_stdout!(
-                "Trying to run for {} crates in the directory at {}",
-                crates.len(),
-                path.display()
-            );
-            crates
+            gather_crates_and_print!(path)
         }
     };
 
     #[cfg(not(feature = "workspace"))]
-    let crates = {
-        let crates = gather_crates_paths_in_dir_or_subdirs(&path);
-        if crates.is_empty() {
-            print_to_stderr!("No crates found in the directory {}.", path.display());
-            return ExitCode::NoCratesFound;
-        }
-        crates
-    };
+    let crates = gather_crates_and_print!(path);
 
     let testable_crates_paths = filter_testable_crates(&crates);
-
     if testable_crates_paths.is_empty() {
         print_to_stderr!(
             "No testable crates found in the directory {}.\
