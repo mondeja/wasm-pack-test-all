@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased - [0.1.0]
+## 2025-05-06 - [0.1.0]
 
 First beta release.
 

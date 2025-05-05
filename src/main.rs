@@ -17,7 +17,7 @@ enum ExitCode {
     NoCratesFound = 4,
     NoTestsFound = 5,
     TestsFailed = 6,
-    UnknownError = 7,
+    ExternalError = 7,
 }
 
 impl PartialEq for ExitCode {
@@ -273,12 +273,17 @@ fn run(args: Vec<String>) -> ExitCode {
             .stderr(std::process::Stdio::inherit())
             .status()
             .unwrap_or_else(|_| {
-                print_to_stderr!(
-                    "Error running wasm-pack test for crate {}: {}",
-                    testable_crate_path.display(),
-                    std::io::Error::last_os_error()
-                );
-                std::process::exit(ExitCode::UnknownError as u8 as i32);
+                if std::io::Error::last_os_error().kind() == std::io::ErrorKind::NotFound {
+                    print_to_stderr!(
+                        "Binary wasm-pack not found. Make sure it is installed and in your PATH."
+                    );
+                } else {
+                    print_to_stderr!(
+                        "wasm-pack test failed with error: {}",
+                        std::io::Error::last_os_error()
+                    );
+                }
+                std::process::exit(ExitCode::ExternalError as u8 as i32);
             });
         if !status.success() {
             exitcode = ExitCode::TestsFailed;
