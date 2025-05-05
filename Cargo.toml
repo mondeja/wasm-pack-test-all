@@ -8,7 +8,7 @@ authors = ["Álvaro Mondéjar Rubio"]
 license = "MIT"
 readme = "README.md"
 keywords = ["wasm", "wasm-pack", "testing", "test", "cli"]
-categories = ["wasm", "cli", "testing"]
+categories = ["wasm", "command-line-interface"]
 
 [[bin]]
 name = "wasm-pack-test-all"
