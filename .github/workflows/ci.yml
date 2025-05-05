@@ -1,0 +1,280 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - v*
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  qa:
+    name: QA
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        job: [pre-commit, lychee, cargo-machete]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        if: matrix.job == 'cargo-machete'
+        uses: hecrj/setup-rust-action@v2
+        with:
+          rust-version: stable
+          profile: minimal
+      - name: Set up Python
+        if: matrix.job == 'pre-commit'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        if: matrix.job == 'pre-commit'
+        run: |
+          pip install --upgrade pip
+          pip install pre-commit
+      - name: Lint
+        if: matrix.job == 'pre-commit'
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 25
+          max_attempts: 3
+          retry_wait_seconds: 15
+          warning_on_retry: false
+          command: pre-commit run --all-files --show-diff-on-failure
+      - name: Restore lychee cache
+        if: matrix.job == 'lychee'
+        uses: actions/cache@v4
+        with:
+          path: .lycheecache
+          key: cache-lychee-${{ github.sha }}
+          restore-keys: cache-lychee-
+      - name: Run Lychee
+        if: matrix.job == 'lychee'
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: "--cache --max-cache-age 1d ."
+      - uses: taiki-e/install-action@v2
+        if: matrix.job == 'cargo-machete'
+        with:
+          tool: cargo-machete
+      - name: Run cargo-machete
+        if: matrix.job == 'cargo-machete'
+        run: cargo machete --skip-target-dir
+
+  build:
+    name: Build wasm-pack-test-all
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-14 # ARM
+          - macos-13 # X86
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: hecrj/setup-rust-action@v2
+        with:
+          rust-version: nightly
+          components: rust-src
+          profile: minimal
+      - name: Install UPX
+        if: matrix.runs-on == 'windows-latest'
+        run: choco install upx
+      - name: Install UPX
+        if: startsWith(matrix.runs-on, 'ubuntu')
+        run: sudo apt-get install upx
+      - name: Get Rust target
+        id: get-rust-target
+        shell: bash
+        run: |
+          echo "target=$(rustc -vV | sed -n 's|host: ||p')" >> $GITHUB_OUTPUT
+      - name: Build
+        shell: bash
+        run: |
+          RUSTFLAGS="-Zlocation-detail=none -Cpanic=abort" \
+            cargo +nightly build \
+              -Z build-std=std,panic_abort \
+              -Z build-std-features=optimize_for_size,panic_immediate_abort \
+              --target ${{ steps.get-rust-target.outputs.target }} \
+              --release \
+              --features=manpages
+      - name: Standarize Windows executable path
+        if: matrix.runs-on == 'windows-latest'
+        shell: bash
+        run: |
+          path="target/${{ steps.get-rust-target.outputs.target }}/release"
+          mv "${path}/wasm-pack-test-all.exe" "${path}/wasm-pack-test-all"
+      - name: Compress with UPX
+        if: ${{ !startsWith(matrix.runs-on, 'macos') }}
+        shell: bash
+        run: |
+          upx --best --lzma \
+            target/${{ steps.get-rust-target.outputs.target }}/release/wasm-pack-test-all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.runs-on }}-build
+          path: ./target/${{ steps.get-rust-target.outputs.target }}/release/wasm-pack-test-all
+          if-no-files-found: error
+          overwrite: true
+
+  dist:
+    name: Create distribution packages
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Create directories
+        run: mkdir -p dist build/mac build/linux build/windows
+      - name: Download MacOS ARM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-14-build
+          path: ./build/mac-arm64
+      - name: Download MacOS X86 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-13-build
+          path: ./build/mac-x64
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-latest-build
+          path: ./build/linux
+      - name: Download Linux ARM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-24.04-arm-build
+          path: ./build/linux-arm
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-latest-build
+          path: ./build/windows
+      - name: Create Linux tarballs
+        run: |
+          tar -czf dist/wasm-pack-test-all-x86_64-unknown-linux-gnu.tar.gz -C build/linux wasm-pack-test-all
+          tar -czf dist/wasm-pack-test-all-arm64-unknown-linux-gnu.tar.gz -C build/linux-arm wasm-pack-test-all
+      - name: Create MacOS tarballs
+        run: |
+          tar -czf dist/wasm-pack-test-all-x86_64-apple-darwin.tar.gz -C build/mac-x64 wasm-pack-test-all
+          tar -czf dist/wasm-pack-test-all-aarch64-apple-darwin.tar.gz -C build/mac-arm64 wasm-pack-test-all
+      - name: Create Windows zip
+        run: |
+          cd build/windows
+          mv wasm-pack-test-all wasm-pack-test-all.exe
+          7z a -tzip ../../dist/wasm-pack-test-all-x86_64-pc-windows-msvc.zip wasm-pack-test-all.exe
+      - name: Remove build directories
+        run: rm -rf build
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: ./dist
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: hecrj/setup-rust-action@v2
+        with:
+          rust-version: stable
+          profile: minimal
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-unit-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build
+        run: cargo build --all-features
+      - name: Run unit tests
+        run: cargo test --all-features
+
+  test-release:
+    needs:
+      - qa
+      - unit-tests
+      - dist
+    if: |
+      '${{ github.event.pull_request.user.login }}' == 'mondeja' ||
+      startsWith(github.ref, 'refs/tags/') ||
+      github.ref == 'refs/heads/master'
+    name: Test release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: hecrj/setup-rust-action@v2
+        with:
+          rust-version: stable
+          profile: minimal
+      - name: Publish
+        run: |
+          cargo login ${{ secrets.CRATES_TOKEN }}
+          cargo publish -v --dry-run --features=manpages
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    name: Release wasm-pack-test-all
+    needs: test-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: hecrj/setup-rust-action@v2
+        with:
+          rust-version: stable
+          profile: minimal
+      - name: Publish
+        run: |
+          cargo login ${{ secrets.CRATES_TOKEN }}
+          cargo publish -v --features=manpages
+
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    name: Create release
+    needs: release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get tag metadata
+        id: tag
+        run: |
+          TAG_TITLE=${GITHUB_REF#refs/*/}
+          echo "title=$TAG_TITLE" >> $GITHUB_OUTPUT
+      - name: Download distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: ./dist
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: ${{ steps.tag.outputs.title }}
+          tag_name: ${{ steps.tag.outputs.title }}
+          body: |
+            See [CHANGELOG](https://github.com/mondeja/wasm-pack-test-all/blob/master/CHANGELOG.md).
+          draft: false
+          prerelease: false
+          files: ./dist/*

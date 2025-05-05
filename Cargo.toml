@@ -1,0 +1,35 @@
+[package]
+name = "wasm-pack-test-all"
+version = "0.0.1"
+edition = "2021"
+description = "Wrapper for `wasm-pack test` that runs tests for all crates in a workspace or directory."
+repository = "https://github.com/mondeja/wasm-pack-test-all"
+authors = ["Álvaro Mondéjar Rubio"]
+license = "MIT"
+readme = "README.md"
+keywords = ["wasm", "wasm-pack", "testing", "test", "cli"]
+categories = ["wasm", "cli", "testing"]
+
+[[bin]]
+name = "wasm-pack-test-all"
+
+[dependencies]
+# Compatible versions with `wasm-pack`
+which = "4"
+clap = { version = "4", default-features = false, features = ["std", "help"] }
+toml = "0.7"
+
+[dev-dependencies]
+assert_cmd = "2"
+ctor = "0.4"
+tempfile = "3"
+
+[profile.release]
+strip = true
+opt-level = "z"  # optimize for size
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }{ archive-suffix }"

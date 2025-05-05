@@ -1,0 +1,10 @@
+- id: wasm-pack-test-all
+  name: wasm-pack-test-all
+  alias: wasm-pack-test-all
+  description: Wrapper for `wasm-pack test` that runs tests for all crates in a workspace or directory.
+  language: rust
+  entry: wasm-pack-test-all
+  args: []
+  pass_filenames: false
+  additional_dependencies: []
+  minimum_pre_commit_version: "2.21.0"
