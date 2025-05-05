@@ -151,7 +151,7 @@ fn path_to_crate_triggers_error() {
 
 #[cfg(feature = "workspace")]
 #[test]
-fn no_crates_found_in_workspace() {
+fn no_crates_found_in_passed_workspace() {
     let dir = tempdir();
     let mut cmd = init_cmd(&dir);
     let dir_path_str = dir.path().to_str().unwrap();
@@ -171,8 +171,30 @@ fn no_crates_found_in_workspace() {
     assert!(stderr.contains(dir_path_str), "{}", stderr);
 }
 
+#[cfg(feature = "workspace")]
 #[test]
-fn no_crates_found_in_directory() {
+fn no_crates_found_in_current_dir_workspace() {
+    let dir = tempdir();
+    let mut cmd = init_cmd(&dir);
+    cmd.current_dir(dir.path());
+    let dir_path_str = dir.path().to_str().unwrap();
+
+    let cargo_toml_path = dir.path().join("Cargo.toml");
+    std::fs::write(&cargo_toml_path, "[workspace]\n").unwrap();
+
+    let output = cmd.output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("No crates found in the workspace "),
+        "{}",
+        stderr
+    );
+    assert!(stderr.contains(dir_path_str), "{}", stderr);
+}
+
+#[test]
+fn no_crates_found_in_passed_directory() {
     let dir = tempdir();
     let mut cmd = init_cmd(&dir);
     let dir_path_str = dir.path().to_str().unwrap();
@@ -190,7 +212,25 @@ fn no_crates_found_in_directory() {
 }
 
 #[test]
-fn no_testable_crates_found() {
+fn no_crates_found_in_current_directory() {
+    let dir = tempdir();
+    let mut cmd = init_cmd(&dir);
+    cmd.current_dir(dir.path());
+    let dir_path_str = dir.path().to_str().unwrap();
+
+    let output = cmd.output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("No crates found in the directory "),
+        "{}",
+        stderr
+    );
+    assert!(stderr.contains(dir_path_str), "{}", stderr);
+}
+
+#[test]
+fn no_testable_crates_found_in_passed_directory() {
     let dir = tempdir();
     let mut cmd = init_cmd(&dir);
     let dir_path_str = dir.path().to_str().unwrap();
@@ -212,11 +252,83 @@ fn no_testable_crates_found() {
 }
 
 #[test]
-fn tests_passing() {
+fn no_testable_crates_found_in_current_directory() {
+    let dir = tempdir();
+    let mut cmd = init_cmd(&dir);
+    cmd.current_dir(dir.path());
+    let dir_path_str = dir.path().to_str().unwrap();
+    cmd.arg("--node");
+
+    create_cargo_toml_for_workspace(&dir, &["foo", "bar"]);
+    create_crates_with_librs(&dir, &[("foo", "fn foo() {}"), ("bar", "fn bar() {}")]);
+
+    let output = cmd.output().unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("No testable crates found in the directory "),
+        "{}",
+        stderr
+    );
+    assert!(stderr.contains(dir_path_str), "{}", stderr);
+}
+
+#[test]
+fn tests_pass_with_passed_directory() {
     let dir = tempdir();
     let mut cmd = init_cmd(&dir);
     let dir_path_str = dir.path().to_str().unwrap();
     cmd.arg(dir_path_str);
+    cmd.arg("--node");
+
+    #[cfg(feature = "workspace")]
+    create_cargo_toml_for_workspace(&dir, &["foo", "bar"]);
+
+    create_crates_with_librs(
+        &dir,
+        &[
+            (
+                "foo",
+                r#"use wasm_bindgen_test::*;
+
+                #[wasm_bindgen_test]
+                fn foo() {
+                    assert_eq!(1, 1);
+                }
+                "#,
+            ),
+            (
+                "bar",
+                r#"use wasm_bindgen_test::*;
+
+                #[wasm_bindgen_test]
+                fn bar() {
+                    assert_eq!(1, 1);
+                }
+                "#,
+            ),
+        ],
+    );
+
+    let output = cmd.output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout_stderr = format!("STDOUT: {}\n\nSTDERR: {}", stdout, stderr);
+    assert!(output.status.success(), "{}", stdout_stderr);
+    assert!(stdout.contains("test bar ... ok"), "{}", stdout_stderr);
+    assert!(stdout.contains("test foo ... ok"), "{}", stdout_stderr);
+    assert!(
+        stdout.contains("[wasm-pack-test-all] All tests passed!"),
+        "{}",
+        stdout_stderr
+    );
+}
+
+#[test]
+fn tests_pass_with_current_directory() {
+    let dir = tempdir();
+    let mut cmd = init_cmd(&dir);
+    cmd.current_dir(dir.path());
     cmd.arg("--node");
 
     #[cfg(feature = "workspace")]
