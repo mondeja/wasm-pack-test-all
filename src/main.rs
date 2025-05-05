@@ -30,7 +30,7 @@ fn print_help() {
     eprintln!(
         r#"Wrapper for `wasm-pack test` that runs tests for all crates in a workspace or directory.
 
-wasm-pack-test-all [-h/--help] [-V/--version] [PATH] [WASM_PACK_TEST_OPTIONS] [-- CARGO_TEST_OPTIONS]
+wasm-pack-test-all [-h/--help] [-V/--version] [PATH] [WASM_PACK_TEST_OPTIONS] [-- EXTRA_OPTIONS]
 
 Arguments:
   [PATH]
@@ -41,8 +41,8 @@ Arguments:
 
           Passing a path as the first argument of EXTRA_OPTIONS will trigger an error.
 
-  [CARGO_TEST_OPTIONS]...
-          Options to pass to `cargo test`. Use `--` to separate them from the `wasm-pack test` options.
+  [EXTRA_OPTIONS]...
+          Options to pass to `wasm-bindgen-test-runner` and `cargo test`. Use subsecuent `--` separators to separate them from `wasm-pack test` options.
 
 Options:
   -h, --help
