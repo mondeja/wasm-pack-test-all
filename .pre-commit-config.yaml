@@ -46,3 +46,21 @@ repos:
             -D,
             clippy::semicolon_if_nothing_returned,
           ]
+      - id: clippy
+        alias: clippy-workspace-feature
+        name: clippy-workspace-feature
+        args:
+          [
+            --features=workspace,
+            --,
+            -D,
+            clippy::perf,
+            -D,
+            clippy::print_stdout,
+            -D,
+            clippy::explicit_iter_loop,
+            -D,
+            clippy::uninlined_format_args,
+            -D,
+            clippy::semicolon_if_nothing_returned,
+          ]
