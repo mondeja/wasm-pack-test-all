@@ -204,12 +204,14 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-unit-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build
-        run: cargo build --all-features
-      - name: Check wasm-pack is installed
-        run: wasm-pack --version
-      - name: Run unit tests
-        run: cargo test --all-features
+      - name: Build without features
+        run: cargo build
+      - name: Run unit tests without features
+        run: cargo test
+      - name: Build with workspace feature
+        run: cargo build --features workspace
+      - name: Run unit tests for workspace feature
+        run: cargo test --features workspace
 
   test-release:
     needs:

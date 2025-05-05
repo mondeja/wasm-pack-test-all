@@ -12,4 +12,6 @@ You've Rust installed.
 ## Commands
 
 - `pre-commit run -a` to lint and format all files.
-- `cargo build && cargo test` to run all tests.
+- `cargo build && cargo test` to run all tests without feature flags.
+- `cargo build --features workspace && cargo test --features workspace` to run
+  all tests with the `workspace` feature.

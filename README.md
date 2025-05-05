@@ -42,13 +42,14 @@ repos:
 wasm-pack-test-all [PATH] [WASM_PACK_TEST_OPTIONS]... -- [CARGO_TEST_OPTIONS]...
 ```
 
-When running the command without any arguments, if there is a `Cargo.toml` file
-in the current directory with a workspace configured, it will run
-`wasm-pack test` for all crates in the workspace. When there it is not a
-workspace, it will run `wasm-pack test` for all crates in the current directory
-and subdirectories.
+The crates to test are discovered inside the current directory or the provided
+path.
 
-Providing a path, it will run `wasm-pack test` for all crates in that path.
+With the `workspace` feature enabled, it will run `wasm-pack test` for all crates
+in the workspace which directory is the current directory or the provided path.
+If the `workspace` feature is not enabled, it will run `wasm-pack test` for all
+crates in the directory and subdirectories.
+
 Providing extra options, they will be passed to `wasm-pack test` for each crate.
 To pass options to `cargo test`, use the `--` separator.
 
@@ -69,6 +70,16 @@ wasm-pack-test-all tests/end2end --chrome
 ```sh
 wasm-pack-test-all tests/end2end --firefox --release -- --offline
 ```
+
+## Features
+
+All crate features are disabled by default.
+
+- `workspace`: Enable workspace support. When using this feature, when no path
+  argument is provided, `wasm-pack-test-all` will try to discover a workspace
+  in the current directory and run `wasm-pack test` for all crates in the
+  workspace. If a path is provided, it will try to discover a workspace in the
+  provided path and run `wasm-pack test` for all crates in the workspace.
 
 [cargo-binstall]: https://github.com/cargo-bins/cargo-binstall
 [pre-commit]: https://pre-commit.com

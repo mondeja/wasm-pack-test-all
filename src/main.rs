@@ -38,6 +38,22 @@ macro_rules! print_to_stdout {
     }};
 }
 
+macro_rules! gather_crate_paths {
+    ($path:ident) => {{
+        let crates = gather_crates_paths_in_dir_or_subdirs(&$path);
+        if crates.is_empty() {
+            print_to_stderr!("No crates found in the directory {}.", &$path.display());
+            return ExitCode::NoCratesFound;
+        }
+        print_to_stdout!(
+            "Found {} crates in the directory at {}",
+            crates.len(),
+            &$path.display()
+        );
+        crates
+    }};
+}
+
 #[doc(hidden)]
 /// Run the wasm-pack-test-all CLI and return the exit code.
 fn run(cmd: &mut clap::Command) -> ExitCode {
@@ -81,59 +97,61 @@ fn run(cmd: &mut clap::Command) -> ExitCode {
         std::env::current_dir().unwrap()
     };
 
-    let cargo_toml_path = path.join("Cargo.toml");
-    let testable_crates_paths = filter_testable_crates(&if cargo_toml_path.is_file() {
-        let content = std::fs::read_to_string(cargo_toml_path).unwrap();
-        if content.contains("[workspace]") {
-            let content_parsed = toml::de::from_str::<toml::Value>(&content)
-                .unwrap_or(toml::Value::Table(toml::map::Map::new()));
-            let workspace_members = content_parsed
-                .get("workspace")
-                .and_then(|v| v.get("members"))
-                .and_then(|v| v.as_array())
-                .unwrap_or(&Vec::new())
-                .iter()
-                .filter_map(|v| v.as_str())
-                .map(|s| path.join(s))
-                .collect::<Vec<_>>();
-            if workspace_members.is_empty() {
-                print_to_stderr!("No crates found in the workspace {}.", path.display());
-                return ExitCode::NoCratesFound;
-            }
-            for workspace_member in &workspace_members {
-                if !workspace_member.exists() {
-                    print_to_stderr!(
-                        "The workspace member {} does not exists.",
-                        workspace_member.display()
-                    );
-                    return ExitCode::PathNotFound;
+    #[cfg(feature = "workspace")]
+    let crates = {
+        let cargo_toml_path = path.join("Cargo.toml");
+        if cargo_toml_path.is_file() {
+            let content = std::fs::read_to_string(cargo_toml_path).unwrap();
+            if content.contains("[workspace]") {
+                let content_parsed = toml::de::from_str::<toml::Value>(&content)
+                    .unwrap_or(toml::Value::Table(toml::map::Map::new()));
+                let workspace_members = content_parsed
+                    .get("workspace")
+                    .and_then(|v| v.get("members"))
+                    .and_then(|v| v.as_array())
+                    .unwrap_or(&Vec::new())
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| path.join(s))
+                    .collect::<Vec<_>>();
+                if workspace_members.is_empty() {
+                    print_to_stderr!("No crates found in the workspace {}.", path.display());
+                    return ExitCode::NoCratesFound;
                 }
-                if !workspace_member.is_dir() {
-                    print_to_stderr!(
-                        "The workspace member {} is not a directory.",
-                        workspace_member.display()
-                    );
-                    return ExitCode::NotADirectory;
+                for workspace_member in &workspace_members {
+                    if !workspace_member.exists() {
+                        print_to_stderr!(
+                            "The workspace member {} does not exists.",
+                            workspace_member.display()
+                        );
+                        return ExitCode::PathNotFound;
+                    }
+                    if !workspace_member.is_dir() {
+                        print_to_stderr!(
+                            "The workspace member {} is not a directory.",
+                            workspace_member.display()
+                        );
+                        return ExitCode::NotADirectory;
+                    }
                 }
+                print_to_stdout!(
+                    "Trying to run for {} crates in the workspace at {}",
+                    workspace_members.len(),
+                    path.display()
+                );
+                workspace_members
+            } else {
+                gather_crate_paths!(path)
             }
-            workspace_members
         } else {
-            let crates = gather_crates_paths_in_dir_or_subdirs(&path);
-            if crates.is_empty() {
-                print_to_stderr!("No crates found in the directory {}.", path.display());
-                return ExitCode::NoCratesFound;
-            }
-            crates
+            gather_crate_paths!(path)
         }
-    } else {
-        let crates = gather_crates_paths_in_dir_or_subdirs(&path);
-        if crates.is_empty() {
-            print_to_stderr!("No crates found in the directory {}.", path.display());
-            return ExitCode::NoCratesFound;
-        }
-        crates
-    });
+    };
 
+    #[cfg(not(feature = "workspace"))]
+    let crates = gather_crate_paths!(path);
+
+    let testable_crates_paths = filter_testable_crates(&crates);
     if testable_crates_paths.is_empty() {
         print_to_stderr!(
             "No testable crates found in the directory {}.\
@@ -143,6 +161,9 @@ fn run(cmd: &mut clap::Command) -> ExitCode {
         );
         return ExitCode::NoTestsFound;
     }
+
+    print_to_stdout!("Found {} testable crates.", testable_crates_paths.len(),);
+    print_to_stdout!("Running tests...");
 
     let extra_options: Vec<String> = matches
         .get_many::<String>("extra_options")

@@ -39,6 +39,40 @@ fn init_cmd(dir: &TempDir) -> assert_cmd::Command {
     cmd
 }
 
+fn create_cargo_toml_for_workspace(dir: &TempDir, members: &[&'static str]) {
+    let cargo_toml_path = dir.path().join("Cargo.toml");
+    let mut content_str = "[workspace]\nresolver = \"2\"\nmembers = [".to_string();
+    for member in members {
+        content_str.push_str(&format!("\"{}\", ", member));
+    }
+    content_str.pop(); // remove last comma
+    content_str.pop(); // remove last space
+    content_str.push(']');
+    std::fs::write(&cargo_toml_path, &content_str).unwrap();
+}
+
+fn create_crates_with_librs(dir: &TempDir, names_and_contents: &[(&str, &str)]) {
+    for (name, content) in names_and_contents {
+        let crate_dir = dir.path().join(name);
+        std::fs::create_dir(&crate_dir).unwrap();
+        std::fs::write(
+            crate_dir.join("Cargo.toml"),
+            format!(
+                r#"[package]
+name = "{name}"
+edition = "2021"
+
+[dependencies]
+wasm-bindgen-test = {{ version = ">=0.3", default-features = false, features = ["std"] }}
+"#
+            ),
+        )
+        .unwrap();
+        std::fs::create_dir(crate_dir.join("src")).unwrap();
+        std::fs::write(crate_dir.join("src").join("lib.rs"), content).unwrap();
+    }
+}
+
 #[test]
 fn help_option_prints_help_to_stderr_and_exitcode_1() {
     let dir = tempdir();
@@ -68,7 +102,7 @@ fn path_provided_is_not_a_directory() {
     let dir = tempdir();
     let file = dir.path().join("foo.txt");
     let file_path_str = file.to_str().unwrap();
-    std::fs::write(&file, "2015-10-16 food\n  expenses:food     $10\n").unwrap();
+    std::fs::write(&file, "foo bar baz\n").unwrap();
 
     let mut cmd = init_cmd(&dir);
     cmd.arg(file_path_str);
@@ -95,6 +129,7 @@ fn path_provided_does_not_exists() {
     assert!(stderr.contains(" does not exists."), "{}", stderr);
 }
 
+#[cfg(feature = "workspace")]
 #[test]
 fn no_crates_found_in_workspace() {
     let dir = tempdir();
@@ -141,23 +176,11 @@ fn no_testable_crates_found() {
     let mut cmd = init_cmd(&dir);
     let dir_path_str = dir.path().to_str().unwrap();
     cmd.arg(dir_path_str);
+    cmd.arg("--node");
 
-    let cargo_toml_path = dir.path().join("Cargo.toml");
-    std::fs::write(&cargo_toml_path, "[workspace]\nmembers = [\"./foo\"]\n").unwrap();
-    std::fs::create_dir(dir.path().join("foo")).unwrap();
-    std::fs::write(
-        dir.path().join("foo").join("Cargo.toml"),
-        "[package]\nname = \"foo\"\n",
-    )
-    .unwrap();
-    std::fs::create_dir(dir.path().join("foo").join("src")).unwrap();
-    std::fs::write(
-        dir.path().join("foo").join("src").join("lib.rs"),
-        "fn foo() {}\n",
-    )
-    .unwrap();
+    create_cargo_toml_for_workspace(&dir, &["foo", "bar"]);
+    create_crates_with_librs(&dir, &[("foo", "fn foo() {}"), ("bar", "fn bar() {}")]);
 
-    cmd.arg(cargo_toml_path.to_str().unwrap());
     let output = cmd.output().unwrap();
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -177,29 +200,44 @@ fn tests_passing() {
     cmd.arg(dir_path_str);
     cmd.arg("--node");
 
-    let cargo_toml_path = dir.path().join("Cargo.toml");
-    std::fs::write(&cargo_toml_path, "[workspace]\nmembers = [\"./foo\"]\n").unwrap();
-    std::fs::create_dir(dir.path().join("foo")).unwrap();
-    std::fs::write(
-        dir.path().join("foo").join("Cargo.toml"),
-        "[package]\nname = \"foo\"\nedition = \"2021\"\n\n[dependencies]\nwasm-bindgen-test = \"0.3\"\n",
-    )
-    .unwrap();
-    std::fs::create_dir(dir.path().join("foo").join("src")).unwrap();
-    std::fs::write(
-        dir.path().join("foo").join("src").join("lib.rs"),
-        "use wasm_bindgen_test::*;\n\n#[wasm_bindgen_test]\nfn foo() {assert_eq!(1, 1)}\n",
-    )
-    .unwrap();
+    #[cfg(feature = "workspace")]
+    create_cargo_toml_for_workspace(&dir, &["foo", "bar"]);
 
-    cmd.arg(dir_path_str);
+    create_crates_with_librs(
+        &dir,
+        &[
+            (
+                "foo",
+                r#"use wasm_bindgen_test::*;
+
+                #[wasm_bindgen_test]
+                fn foo() {
+                    assert_eq!(1, 1);
+                }
+                "#,
+            ),
+            (
+                "bar",
+                r#"use wasm_bindgen_test::*;
+
+                #[wasm_bindgen_test]
+                fn bar() {
+                    assert_eq!(1, 1);
+                }
+                "#,
+            ),
+        ],
+    );
+
     let output = cmd.output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout_stderr = format!("STDOUT: {}\n\nSTDERR: {}", stdout, stderr);
     assert!(output.status.success(), "{}", stdout_stderr);
+    assert!(stdout.contains("test bar ... ok"), "{}", stdout_stderr);
+    assert!(stdout.contains("test foo ... ok"), "{}", stdout_stderr);
     assert!(
-        stdout.contains("test result: ok. 1 passed; 0 failed; 0 ignored; 0 filtered out; finished"),
+        stdout.contains("[wasm-pack-test-all] All tests passed!"),
         "{}",
         stdout_stderr
     );
