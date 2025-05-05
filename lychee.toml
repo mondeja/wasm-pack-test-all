@@ -1,0 +1,4 @@
+exclude = [
+  '^https://github\.com/mondeja/wasm-pack-test-all/compare',
+]
+exclude_path = ["lychee.toml"]

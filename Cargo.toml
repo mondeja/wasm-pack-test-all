@@ -15,7 +15,6 @@ name = "wasm-pack-test-all"
 
 [dependencies]
 # Compatible versions with `wasm-pack`
-which = "4"
 clap = { version = "4", default-features = false, features = ["std", "help"] }
 toml = "0.7"
 

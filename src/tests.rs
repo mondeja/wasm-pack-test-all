@@ -195,6 +195,12 @@ fn tests_passing() {
     cmd.arg(dir_path_str);
     let output = cmd.output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(output.status.success());
-    assert!(stdout.contains("test result: ok. 1 passed; 0 failed; 0 ignored; 0 filtered out; finished"), "{}", stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout_stderr = format!("STDOUT: {}\n\nSTDERR: {}", stdout, stderr);
+    assert!(output.status.success(), "{}", stdout_stderr);
+    assert!(
+        stdout.contains("test result: ok. 1 passed; 0 failed; 0 ignored; 0 filtered out; finished"),
+        "{}",
+        stdout_stderr
+    );
 }
