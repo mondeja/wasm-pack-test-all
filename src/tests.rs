@@ -160,7 +160,6 @@ fn no_crates_found_in_workspace() {
     let cargo_toml_path = dir.path().join("Cargo.toml");
     std::fs::write(&cargo_toml_path, "[workspace]\n").unwrap();
 
-    cmd.arg(cargo_toml_path.to_str().unwrap());
     let output = cmd.output().unwrap();
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
