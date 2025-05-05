@@ -279,7 +279,7 @@ fn run(args: Vec<String>) -> ExitCode {
                     );
                 } else {
                     print_to_stderr!(
-                        "wasm-pack test failed with error: {}",
+                        "`wasm-pack test` command failed with error: {}",
                         std::io::Error::last_os_error()
                     );
                 }
