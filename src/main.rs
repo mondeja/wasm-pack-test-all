@@ -38,7 +38,7 @@ macro_rules! print_to_stdout {
     }};
 }
 
-macro_rules! gather_crates_and_print {
+macro_rules! gather_crate_paths {
     ($path:ident) => {{
         let crates = gather_crates_paths_in_dir_or_subdirs(&$path);
         if crates.is_empty() {
@@ -141,15 +141,15 @@ fn run(cmd: &mut clap::Command) -> ExitCode {
                 );
                 workspace_members
             } else {
-                gather_crates_and_print!(path)
+                gather_crate_paths!(path)
             }
         } else {
-            gather_crates_and_print!(path)
+            gather_crate_paths!(path)
         }
     };
 
     #[cfg(not(feature = "workspace"))]
-    let crates = gather_crates_and_print!(path);
+    let crates = gather_crate_paths!(path);
 
     let testable_crates_paths = filter_testable_crates(&crates);
     if testable_crates_paths.is_empty() {
