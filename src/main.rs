@@ -218,9 +218,7 @@ fn run(args: Vec<String>) -> ExitCode {
     };
 
     #[cfg(not(feature = "workspace"))]
-    let crates = gather_crate_paths!(path);
-
-    let testable_crates_paths = filter_testable_crates(&crates);
+    let testable_crates_paths = gather_crate_paths!(path);
     if testable_crates_paths.is_empty() {
         print_to_stderr!(
             "No testable crates found in the directory {}.\
@@ -315,7 +313,6 @@ fn gather_crates_paths_in_subdirs(path: &std::path::PathBuf) -> Vec<std::path::P
     for entry in std::fs::read_dir(path).unwrap() {
         let entry = entry.unwrap();
         let entry_path = entry.path();
-        println!("entry_path: {:?}", entry_path);
         if entry_path.is_dir() {
             paths.extend(gather_crates_paths_in_subdirs(&entry_path));
         } else if entry_path.is_file()
