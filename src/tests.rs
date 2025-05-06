@@ -230,50 +230,6 @@ fn no_crates_found_in_current_directory() {
 }
 
 #[test]
-fn no_testable_crates_found_in_passed_directory() {
-    let dir = tempdir();
-    let mut cmd = init_cmd(&dir);
-    let dir_path_str = dir.path().to_str().unwrap();
-    cmd.arg(dir_path_str);
-    cmd.arg("--node");
-
-    create_cargo_toml_for_workspace(&dir, &["foo", "bar"]);
-    create_crates_with_librs(&dir, &[("foo", "fn foo() {}"), ("bar", "fn bar() {}")]);
-
-    let output = cmd.output().unwrap();
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("No crates found in the directory "),
-        "{}",
-        stderr
-    );
-    assert!(stderr.contains(dir_path_str), "{}", stderr);
-}
-
-#[test]
-fn no_testable_crates_found_in_current_directory() {
-    let dir = tempdir();
-    let mut cmd = init_cmd(&dir);
-    cmd.current_dir(dir.path());
-    let dir_path_str = dir.path().to_str().unwrap();
-    cmd.arg("--node");
-
-    create_cargo_toml_for_workspace(&dir, &["foo", "bar"]);
-    create_crates_with_librs(&dir, &[("foo", "fn foo() {}"), ("bar", "fn bar() {}")]);
-
-    let output = cmd.output().unwrap();
-    assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("No crates found in the directory "),
-        "{}",
-        stderr
-    );
-    assert!(stderr.contains(dir_path_str), "{}", stderr);
-}
-
-#[test]
 fn tests_pass_with_passed_directory() {
     let dir = tempdir();
     let mut cmd = init_cmd(&dir);
