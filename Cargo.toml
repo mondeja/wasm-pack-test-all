@@ -1,6 +1,6 @@
 [package]
 name = "wasm-pack-test-all"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Wrapper for `wasm-pack test` that runs tests for all crates in a workspace or directory."
 repository = "https://github.com/mondeja/wasm-pack-test-all"

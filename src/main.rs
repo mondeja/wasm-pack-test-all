@@ -167,7 +167,7 @@ fn run(args: Vec<String>) -> ExitCode {
     };
 
     #[cfg(feature = "workspace")]
-    let crates = {
+    let crates_paths = {
         let cargo_toml_path = path.join("Cargo.toml");
         if cargo_toml_path.is_file() {
             let content = std::fs::read_to_string(cargo_toml_path).unwrap();
@@ -218,10 +218,9 @@ fn run(args: Vec<String>) -> ExitCode {
     };
 
     #[cfg(not(feature = "workspace"))]
-    let crates = gather_crate_paths!(path);
+    let crates_paths = gather_crate_paths!(path);
 
-    let testable_crates_paths = filter_testable_crates(&crates);
-    if testable_crates_paths.is_empty() {
+    if crates_paths.is_empty() {
         print_to_stderr!(
             "No testable crates found in the directory {}.\
             Make sure that at least one of the files in the subdirectories\
@@ -231,10 +230,12 @@ fn run(args: Vec<String>) -> ExitCode {
         return ExitCode::NoTestsFound;
     }
 
-    print_to_stdout!("Found {} testable crates.", testable_crates_paths.len(),);
-    print_to_stdout!("Running tests...");
+    print_to_stdout!("Running tests for the next crates:");
+    for crate_path in &crates_paths {
+        print_to_stdout!("  - {}", crate_path.display());
+    }
 
-    for testable_crate_path in testable_crates_paths {
+    for crate_path in crates_paths {
         let args = format!(
             "wasm-pack test {}{}{}",
             if wasm_pack_test_options.is_empty() {
@@ -249,7 +250,7 @@ fn run(args: Vec<String>) -> ExitCode {
                         .join(" ")
                 )
             },
-            testable_crate_path.display(),
+            crate_path.display(),
             if cargo_test_options.is_empty() {
                 String::new()
             } else {
@@ -267,7 +268,7 @@ fn run(args: Vec<String>) -> ExitCode {
         let status = std::process::Command::new("wasm-pack")
             .arg("test")
             .args(&wasm_pack_test_options)
-            .arg(&testable_crate_path)
+            .arg(&crate_path)
             .args(&cargo_test_options)
             .stdout(std::process::Stdio::inherit())
             .stderr(std::process::Stdio::inherit())
@@ -299,51 +300,22 @@ fn run(args: Vec<String>) -> ExitCode {
     exitcode
 }
 
-/// Grather all crates paths in the given directory and its subdirectories.
-///
-/// Considers a crate a directory containing a `Cargo.toml` file.
 fn gather_crates_paths_in_dir_or_subdirs(path: &std::path::PathBuf) -> Vec<std::path::PathBuf> {
-    let mut paths = Vec::new();
-    let path_cargo_toml = path.join("Cargo.toml");
-    if path_cargo_toml.is_file() {
-        paths.push(path.clone());
-    }
-    paths.extend(gather_crates_paths_in_subdirs(path));
-    paths
-}
-
-fn gather_crates_paths_in_subdirs(path: &std::path::PathBuf) -> Vec<std::path::PathBuf> {
     let mut paths = Vec::new();
     for entry in std::fs::read_dir(path).unwrap() {
         let entry = entry.unwrap();
         let entry_path = entry.path();
+
         if entry_path.is_dir() {
-            paths.extend(gather_crates_paths_in_subdirs(&entry_path));
-        } else if entry_path.is_file()
-            && entry_path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml"))
-        {
+            paths.extend(gather_crates_paths_in_dir_or_subdirs(&entry_path));
+        } else if entry_path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml")) {
             let new_path = entry_path.parent().unwrap().to_path_buf();
-            if !paths.contains(&new_path) {
-                paths.push(new_path);
+            if is_testable_crate(&new_path) {
+                paths.push(new_path.clone());
             }
         }
     }
     paths
-}
-
-/// Filter testable crates in a given set of crates paths.
-///
-/// A crate is considered testable if one of the files on its subdirectories
-/// contains the string `#[wasm_bindgen_test]`. This is not the same implementation
-/// that `cargo test` uses, but it is a good approximation.
-fn filter_testable_crates(crates_paths: &[std::path::PathBuf]) -> Vec<std::path::PathBuf> {
-    let mut testable_crates = Vec::new();
-    for crate_path in crates_paths {
-        if is_testable_crate(crate_path) {
-            testable_crates.push(crate_path.clone());
-        }
-    }
-    testable_crates
 }
 
 fn is_testable_crate(crate_path: &std::path::PathBuf) -> bool {
@@ -352,6 +324,9 @@ fn is_testable_crate(crate_path: &std::path::PathBuf) -> bool {
         let entry = entry.unwrap();
         if entry.path().is_dir() {
             found = is_testable_crate(&entry.path());
+            if found {
+                break;
+            }
         } else if entry.path().is_file() {
             let content = std::fs::read_to_string(entry.path()).unwrap();
             if content.contains("#[wasm_bindgen_test]") {
