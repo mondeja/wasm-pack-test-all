@@ -351,6 +351,9 @@ fn is_testable_crate(crate_path: &std::path::PathBuf) -> bool {
         let entry = entry.unwrap();
         if entry.path().is_dir() {
             found = is_testable_crate(&entry.path());
+            if found {
+                break;
+            }
         } else if entry.path().is_file() {
             let content = std::fs::read_to_string(entry.path()).unwrap();
             if content.contains("#[wasm_bindgen_test]") {
