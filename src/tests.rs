@@ -244,7 +244,7 @@ fn no_testable_crates_found_in_passed_directory() {
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("No testable crates found in the directory "),
+        stderr.contains("No crates found in the directory "),
         "{}",
         stderr
     );
