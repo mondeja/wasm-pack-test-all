@@ -39,6 +39,7 @@ fn init_cmd(dir: &TempDir) -> assert_cmd::Command {
     cmd
 }
 
+#[cfg(feature = "workspace")]
 fn create_cargo_toml_for_workspace(dir: &TempDir, members: &[&'static str]) {
     let cargo_toml_path = dir.path().join("Cargo.toml");
     let mut content_str = "[workspace]\nresolver = \"2\"\nmembers = [".to_string();
