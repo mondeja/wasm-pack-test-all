@@ -313,14 +313,17 @@ fn gather_crates_paths_in_subdirs(path: &std::path::PathBuf) -> Vec<std::path::P
     for entry in std::fs::read_dir(path).unwrap() {
         let entry = entry.unwrap();
         let entry_path = entry.path();
+
         if entry_path.is_dir() {
             paths.extend(gather_crates_paths_in_subdirs(&entry_path));
-        } else if entry_path.is_file()
-            && entry_path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml"))
-        {
+        } else if entry_path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml")) {
             let new_path = entry_path.parent().unwrap().to_path_buf();
+            println!("new_path: {:?}", new_path);
             if is_testable_crate(&new_path) {
+                println!("--> is testable")
                 paths.push(new_path.clone());
+            } else {
+                println!("--> is not testable")
             }
         }
     }
