@@ -320,10 +320,10 @@ fn gather_crates_paths_in_subdirs(path: &std::path::PathBuf) -> Vec<std::path::P
             let new_path = entry_path.parent().unwrap().to_path_buf();
             println!("new_path: {:?}", new_path);
             if is_testable_crate(&new_path) {
-                println!("--> is testable")
+                println!("--> is testable");
                 paths.push(new_path.clone());
             } else {
-                println!("--> is not testable")
+                println!("--> is not testable");
             }
         }
     }
