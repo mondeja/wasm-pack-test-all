@@ -303,12 +303,10 @@ fn run(args: Vec<String>) -> ExitCode {
 ///
 /// Considers a crate a directory containing a `Cargo.toml` file.
 fn gather_crates_paths_in_dir_or_subdirs(path: &std::path::PathBuf) -> Vec<std::path::PathBuf> {
+    println!("start gather_crates_paths_in_dir_or_subdirs: {:?}", path);
     let mut paths = Vec::new();
-    let path_cargo_toml = path.join("Cargo.toml");
-    if path_cargo_toml.is_file() {
-        paths.push(path.clone());
-    }
     paths.extend(gather_crates_paths_in_subdirs(path));
+    println!("end gather_crates_paths_in_dir_or_subdirs: {:?}", paths);
     paths
 }
 
@@ -317,14 +315,15 @@ fn gather_crates_paths_in_subdirs(path: &std::path::PathBuf) -> Vec<std::path::P
     for entry in std::fs::read_dir(path).unwrap() {
         let entry = entry.unwrap();
         let entry_path = entry.path();
+        println!("entry_path: {:?}", entry_path);
         if entry_path.is_dir() {
             paths.extend(gather_crates_paths_in_subdirs(&entry_path));
         } else if entry_path.is_file()
             && entry_path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml"))
         {
             let new_path = entry_path.parent().unwrap().to_path_buf();
-            if !paths.contains(&new_path) {
-                paths.push(new_path);
+            if is_testable_crate(&new_path) {
+                paths.push(new_path.clone());
             }
         }
     }
