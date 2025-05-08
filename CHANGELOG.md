@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2025-05-08 - [0.1.2]
+
+### Bug fixes
+
+- Don't unwrap collecting crates to test.
+
 ## 2025-05-06 - [0.1.1]
 
 ### Bug fixes
@@ -10,5 +16,6 @@
 
 First beta release.
 
+[0.1.2]: https://github.com/mondeja/wasm-pack-test-all/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/mondeja/wasm-pack-test-all/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mondeja/wasm-pack-test-all/compare/v0.0.1...v0.1.0

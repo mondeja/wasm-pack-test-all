@@ -1,2 +1,3 @@
 config:
   first-line-heading: false
+  no-duplicate-heading: false
