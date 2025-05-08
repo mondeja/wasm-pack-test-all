@@ -1,5 +1,9 @@
 # wasm-pack-test-all
 
+[![License](https://img.shields.io/crates/l/wasm-pack-test-all?logo=mit)](https://github.com/mondeja/wasm-pack-test-all/blob/master/LICENSE)
+[![Tests](https://img.shields.io/github/actions/workflow/status/mondeja/wasm-pack-test-all/ci.yml?label=tests&logo=github)](https://github.com/mondeja/wasm-pack-test-all/actions)
+[![Crates.io downloads](https://img.shields.io/crates/d/wasm-pack-test-all)](https://crates.io/crates/wasm-pack-test-all)
+
 Wrapper for `wasm-pack test` that runs tests for all crates in a workspace or
 directory.
 

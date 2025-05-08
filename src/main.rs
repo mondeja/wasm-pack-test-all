@@ -170,7 +170,7 @@ fn run(args: Vec<String>) -> ExitCode {
     let crates_paths = {
         let cargo_toml_path = path.join("Cargo.toml");
         if cargo_toml_path.is_file() {
-            let content = std::fs::read_to_string(cargo_toml_path).unwrap();
+            let content = std::fs::read_to_string(cargo_toml_path).unwrap_or_default();
             if content.contains("[workspace]") {
                 let content_parsed = toml::de::from_str::<toml::Value>(&content)
                     .unwrap_or(toml::Value::Table(toml::map::Map::new()));
@@ -302,38 +302,48 @@ fn run(args: Vec<String>) -> ExitCode {
 
 fn gather_crates_paths_in_dir_or_subdirs(path: &std::path::PathBuf) -> Vec<std::path::PathBuf> {
     let mut paths = Vec::new();
-    for entry in std::fs::read_dir(path).unwrap() {
-        let entry = entry.unwrap();
-        let entry_path = entry.path();
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for maybe_entry in entries {
+            if let Ok(entry) = maybe_entry {
+                let entry_path = entry.path();
 
-        if entry_path.is_dir() {
-            paths.extend(gather_crates_paths_in_dir_or_subdirs(&entry_path));
-        } else if entry_path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml")) {
-            let new_path = entry_path.parent().unwrap().to_path_buf();
-            if is_testable_crate(&new_path) {
-                paths.push(new_path.clone());
+                if entry_path.is_dir() {
+                    paths.extend(gather_crates_paths_in_dir_or_subdirs(&entry_path));
+                } else if entry_path.file_name() == Some(std::ffi::OsStr::new("Cargo.toml")) {
+                    if let Some(parent) = entry_path.parent() {
+                        let new_path = parent.to_path_buf();
+                        if is_testable_crate(&new_path) {
+                            paths.push(new_path.clone());
+                        }
+                    }
+                }
             }
         }
     }
+
     paths
 }
 
 fn is_testable_crate(crate_path: &std::path::PathBuf) -> bool {
     let mut found = false;
-    for entry in std::fs::read_dir(crate_path).unwrap() {
-        let entry = entry.unwrap();
-        if entry.path().is_dir() {
-            found = is_testable_crate(&entry.path());
-            if found {
-                break;
-            }
-        } else if entry.path().is_file() {
-            let content = std::fs::read_to_string(entry.path()).unwrap();
-            if content.contains("#[wasm_bindgen_test]") {
-                found = true;
-                break;
+    if let Ok(entries) = std::fs::read_dir(crate_path) {
+        for maybe_entry in entries {
+            if let Ok(entry) = maybe_entry {
+                if entry.path().is_dir() {
+                    found = is_testable_crate(&entry.path());
+                    if found {
+                        break;
+                    }
+                } else if entry.path().is_file() {
+                    let content = std::fs::read_to_string(entry.path()).unwrap_or_default();
+                    if content.contains("#[wasm_bindgen_test]") {
+                        found = true;
+                        break;
+                    }
+                }
             }
         }
     }
+
     found
 }
